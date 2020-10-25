@@ -45,7 +45,8 @@ info = {
             'default.qubit.autograd = pennylane.devices.default_qubit_autograd:DefaultQubitAutograd',
             'default.tensor = pennylane.beta.devices.default_tensor:DefaultTensor',
             'default.tensor.tf = pennylane.beta.devices.default_tensor_tf:DefaultTensorTF',
-            'default.mixed = pennylane.devices.default_mixed:DefaultMixed'
+            'default.mixed = pennylane.devices.default_mixed:DefaultMixed',
+            'logging.qubit = pennylane.devices.logging_qubit:LoggingQubit'
             ],
         'console_scripts': [
                 'pl-device-test=pennylane.devices.tests:cli'
