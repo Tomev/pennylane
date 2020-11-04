@@ -9,111 +9,60 @@ from datetime import datetime
 
 from pennylane.devices.default_qubit import DefaultQubit
 
+import inspect
 
+
+def log(func):
+    print_attributes = False
+    def wrapped(*args, **kwargs):
+        try:
+            # https://stackoverflow.com/questions/218616/how-to-get-method-parameter-names
+            # updated with
+            # https://stackoverflow.com/questions/32659552/importing-izip-from-itertools-module-gives-nameerror-in-python-3-x
+            # and modified by me, so it works...
+            args_name = inspect.getfullargspec(func)[0]
+            print(f"Entering: [{func.__name__}] with {len(args)} arguments.")
+
+            if {'cls'}.__contains__(args_name[0]):
+                print(f'Removing {args_name[0]} from arguments list')
+                args_name.pop(0)
+                args_list = list(args)
+                args_list.pop(0)
+                args = tuple(args_list)
+
+            if print_attributes:
+                args_dict = dict(zip(args_name, args))
+
+                i = 1
+                for x in args_dict:
+                    print(f'\t{i}. {x} = {args_dict[x]}')
+                    i += 1
+
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print('Exception in %s : %s' % (func.__name__, e))
+        finally:
+            print("Exiting: [%s]" % func.__name__)
+    return wrapped
+
+
+def trace(cls):
+    # https://stackoverflow.com/a/17019983/190597 (jamylak)
+    # Modified by me for this case.
+    for name, m in inspect.getmembers(cls, lambda x: inspect.isfunction(x) or inspect.ismethod(x)):
+        if {'__repr__', '__init__', '__str__'}.__contains__(name):  # These three methods are not important.
+            continue  # Also they cause problem with recursions.
+        if isinstance(inspect.getattr_static(cls, name), staticmethod):
+            continue  # Static methods were called with self as an argument and it caused a lot of problems for the
+            # logger. Most of them are just staticmethod(numpy.function) therefore are more of tools than instructions,
+            # so I decided to omit them during logging.
+        setattr(cls, name, log(m))
+    return cls
+
+
+@trace
 class LoggingQubit(DefaultQubit):
     name = "Logging qubit PennyLane plugin"
     short_name = "logging.qubit"
     author = "Tomasz Rybotycki"
-
-    @staticmethod
-    def _log(message):
-        print(f'[{datetime.now().strftime("%H:%M:%S")}] LoggingQubit: {message}')
-
-    def __init__(self, wires, *, shots=1000, analytic=True):
-        self._log(f'__init__(wires={wires}, shots={shots}, analytic={analytic})')
-        super().__init__(wires=wires, shots=shots, analytic=analytic)
-
-    def apply(self, operations, rotations=None, **kwargs):
-        self._log(f'apply(operations={operations}, rotations={rotations}, kwargs={kwargs}')
-        super().apply(operations, rotations=None, **kwargs)
-
-    def _apply_operation(self, operation):
-        self._log(f'_apply_operation(operation={operation})')
-        super()._apply_operation(operation)
-
-    def _apply_x(self, state, axes, **kwargs):
-        self._log(f'_apply_x(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_x(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_y(self, state, axes, **kwargs):
-        self._log(f'_apply_y(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_y(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_z(self, state, axes, **kwargs):
-        self._log(f'_apply_z(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_z(state, axes, kwargs)
-
-    def _apply_hadamard(self, state, axes, **kwargs):
-        self._log(f'_apply_hadamard(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_hadamard(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_s(self, state, axes, inverse=False):
-        self._log(f'_apply_s(state={state}, axes={axes}, inverse={inverse})')
-        return super()._apply_s(state, axes, inverse)
-
-    def _apply_t(self, state, axes, inverse=False):
-        self._log(f'_apply_t(state={state}, axes={axes}, inverse={inverse})')
-        return super()._apply_t(state, axes, inverse)
-
-    def _apply_cnot(self, state, axes, **kwargs):
-        self._log(f'_apply_cnot(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_cnot(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_swap(self, state, axes, **kwargs):
-        self._log(f'_apply_swap(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_swap(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_cz(self, state, axes, **kwargs):
-        self._log(f'_apply_cz(state={state}, axes={axes}, kwargs={kwargs}')
-        return super()._apply_cz(state=state, axes=axes, kwargs=kwargs)
-
-    def _apply_phase(self, state, axes, parameters, inverse=False):
-        self._log(f'_apply_phase(state={state}, axes={axes}, parameters={parameters}, inverse={inverse})')
-        return super()._apply_phase(state, axes, inverse)
-
-    def _get_unitary_matrix(self, unitary):  # pylint: disable=no-self-use
-        self._log(f'_get_unitary_matrix(unitary={unitary})')
-        return super()._get_unitary_matrix(unitary)
-
-    @classmethod
-    def capabilities(cls):
-        print('capabilities')
-        return super().capabilities().copy()
-
-    def _create_basis_state(self, index):
-        self._log(f'_create_basis_state(index={index})')
-        return super()._create_basis_state(index)
-
-    @property
-    def state(self):
-        self._log(f'state()')
-        return super().state()
-
-    def _apply_state_vector(self, state, device_wires):
-        self._log(f'_apply_state_vector(state={state}, device_wires={device_wires}')
-        super()._apply_state_vector(state, device_wires)
-
-    def _apply_basis_state(self, state, wires):
-        self._log(f'_apply_basis_state(state={state}, wires={wires}')
-        super()._apply_basis_state(state, wires)
-
-    def _apply_unitary(self, mat, wires):
-        self._log(f'_apply_unitary(mat={mat}, wires={wires})')
-        super()._apply_unitary(mat, wires)
-
-    def _apply_unitary_einsum(self, mat, wires):
-        self._log(f'_apply_unitary_einsum(mat={mat}, wires={wires})')
-        super()._apply_unitary_einsum(mat, wires)
-
-    def _apply_diagonal_unitary(self, phases, wires):
-        self._log(f'_apply_diagonal_unitary(phases={phases}, wires={wires})')
-        super()._apply_diagonal_unitary(phases, wires)
-
-    def reset(self):
-        self._log(f'reset()')
-        super().reset()
-
-    def analytic_probability(self, wires=None):
-        self._log(f'analytic_probability(wires={wires})')
-        return super().analytic_probability(wires)
-        
