@@ -5,32 +5,36 @@ This PennyLane plugin is basically the same thing as default_qubit device, with 
 method call. 
 """
 
+import inspect
 from datetime import datetime
 
 from pennylane.devices.default_qubit import DefaultQubit
 
-import inspect
-
 
 def log(func):
-    print_attributes = False
+    should_print = False
+
     def wrapped(*args, **kwargs):
+        entry = {}
         try:
             # https://stackoverflow.com/questions/218616/how-to-get-method-parameter-names
             # updated with
             # https://stackoverflow.com/questions/32659552/importing-izip-from-itertools-module-gives-nameerror-in-python-3-x
             # and modified by me, so it works...
-            args_name = inspect.getfullargspec(func)[0]
-            print(f"Entering: [{func.__name__}] with {len(args)} arguments.")
+            if should_print:
+                print(f"Entering: [{func.__name__}] with {len(args)} arguments.")
 
-            if {'cls'}.__contains__(args_name[0]):
-                print(f'Removing {args_name[0]} from arguments list')
+            args_name = inspect.getfullargspec(func)[0]
+
+            if args_name[0] == 'cls':
+                if should_print:
+                    print(f'Removing {args_name[0]} from arguments list')
                 args_name.pop(0)
                 args_list = list(args)
                 args_list.pop(0)
                 args = tuple(args_list)
 
-            if print_attributes:
+            if should_print:
                 args_dict = dict(zip(args_name, args))
 
                 i = 1
@@ -38,12 +42,27 @@ def log(func):
                     print(f'\t{i}. {x} = {args_dict[x]}')
                     i += 1
 
+            entry = {
+                'time': datetime.now(),
+                'name': func.__name__,
+                'args': args,
+                'kwargs': kwargs
+            }
+
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                print('Exception in %s : %s' % (func.__name__, e))
+                if should_print:
+                    print('Exception in %s : %s' % (func.__name__, e))
+                entry['exception'] = e
         finally:
-            print("Exiting: [%s]" % func.__name__)
+            if should_print:
+                print("Exiting: [%s]" % func.__name__)
+            if args_name.__contains__('self'):
+                args[0].device_log.append(entry)
+            if should_print:
+                print(f'Log length: {len(args[0].device_log)}')
+
     return wrapped
 
 
@@ -54,8 +73,9 @@ def trace(cls):
         if {'__repr__', '__init__', '__str__'}.__contains__(name):  # These three methods are not important.
             continue  # Also they cause problem with recursions.
         if isinstance(inspect.getattr_static(cls, name), staticmethod):
-            continue  # Static methods were called with self as an argument and it caused a lot of problems for the
-            # logger. Most of them are just staticmethod(numpy.function) therefore are more of tools than instructions,
+            continue
+            # Static methods were called with self as an argument and it caused a lot of problems for the logger.
+            # Most of them are just staticmethod(numpy.function) therefore are more of tools than instructions,
             # so I decided to omit them during logging.
         setattr(cls, name, log(m))
     return cls
@@ -66,3 +86,7 @@ class LoggingQubit(DefaultQubit):
     name = "Logging qubit PennyLane plugin"
     short_name = "logging.qubit"
     author = "Tomasz Rybotycki"
+
+    def __init__(self, wires, *, shots=1000, analytic=True):
+        self.device_log = list()
+        super().__init__(wires, shots=shots, analytic=analytic)
