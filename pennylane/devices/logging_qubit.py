@@ -42,11 +42,14 @@ def log(func):
                     print(f'\t{i}. {x} = {args_dict[x]}')
                     i += 1
 
+            args_reprs = [repr(arg) for arg in args]
+            kwargs_reprs = [repr(kwarg) for kwarg in kwargs]
+
             entry = {
-                'time': datetime.now(),
+                'time': datetime.now().strftime("%m/%d/%Y, %H:%M:%S"),
                 'name': func.__name__,
-                'args': args,
-                'kwargs': kwargs
+                'args': args_reprs,
+                'kwargs': kwargs_reprs
             }
 
             try:
